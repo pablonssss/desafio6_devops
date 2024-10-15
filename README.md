@@ -4,6 +4,7 @@ Trabajo desafio 6  - Jenkins y Apache
 **Instalar Jenkins en VM1** 
 
 #Chequeo si tengo Java instalado
+
 java --version
 
 #El paso siguiente es agregar la clave GPG para garantizar la seguridad del paquete de Jenkins a instalar, para ello ejecutamos los comandos: //
