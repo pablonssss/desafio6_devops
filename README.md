@@ -1,7 +1,8 @@
 # desafio6_devops
 Trabajo desafio 6  - Jenkins y Apache
 
-**Instalar Jenkins en VM1** //
+**Instalar Jenkins en VM1** 
+
 #Chequeo si tengo Java instalado
 java --version
 
