@@ -251,7 +251,6 @@ pipeline {
 <code>
 pipeline {
     agent any
-
     stages {
         stage('Checkout') {
             steps {
@@ -259,7 +258,6 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/pablonssss/repojenkins.git'
             }
         }
-
         stage('Verifico si Apache está instalado') {
             steps {
                 // Verificar si Apache está instalado en VM2, instalar si es necesario
@@ -274,7 +272,6 @@ pipeline {
                 }
             }
         }
-
         stage('Configurar Apache') {
             steps {
                 // Configurar y habilitar Apache en la VM2
@@ -283,7 +280,6 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy en Apache') {
             steps {
                 // Primero copio el archivo a un directorio temporal y luego lo muevo con sudo
@@ -294,7 +290,6 @@ pipeline {
             }
         }
     }
-
     post {
         success {
             // Mensaje en caso de éxito
