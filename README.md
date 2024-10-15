@@ -141,7 +141,169 @@ pipeline {
 }
 </code>
 
+#Agregamos el archivo al repositorio y hacemos commit: "git add Jenkinsfile" , luego "git commit -m "Jenkinsfile para pipeline de Jenkins"
 
+#Luego push: "git push origin main"
 
+**Ahora a la última parte del desafío: Crear un pipeline de Jenkins a través de un Jenkinsfile en un repositorio de GitHub para despliegue automático en un servidor Apache (VM2):**
+**1.Verificar si Apache está instalado.**
+**2.Configurar el servidor Apache.**
+**3.Aplicar los cambios realizados en el repositorio de GitHub sobre Apache (index.html).**
 
+#Primero verificamos que el Apache está instalado:
+#Ejecutamos “sudo systemctl status apache2” para verificar, como no tenemos instalado aún apache, hacemos un “apt update” y “apt install apache2” para instalarlo
 
+#Chequeamos el estado del servicio, luego de instalado: "sudo systemctl status apache2"
+
+#Ahora creo el “Jenkinsfile” que en este caso hará lo siguiente según las etapas:
+#Checkout: Clona el repositorio desde GitHub:
+#Verifica si apache está instalado
+#Configura el Apache para dejar el servicio iniciado
+#“Deploy Apache” Copia el archivo index.html al directorio Apache de la VM2
+
+<code>
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Clono el repo desde GitHub
+                git 'https://github.com/pablonssss/repojenkins.git'
+            }
+        }
+
+        stage('Verifico si el apache esta instalado') {
+            steps {
+                // Verifica si Apache está instalado en la VM2
+                sshagent(['55c5edfe-cded-4a87-937b-b381846887a3']) {
+                    sh 'ssh -o StrictHostKeyChecking=no pablo@10.0.2.17 "sudo systemctl status apache2 || sudo apt-get install apache2 -y"'
+                }
+            }
+        }
+
+        stage('Configure Apache') {
+            steps {
+                // Configura Apache en la VM2
+                sshagent(['55c5edfe-cded-4a87-937b-b381846887a3']) {
+                    sh 'ssh pablo@10.0.2.17 "sudo systemctl start apache2 && sudo systemctl enable apache2"'
+                }
+            }
+        }
+
+        stage('Deploy Apache') {
+            steps {
+                // Copia el archivo index.html al directorio de Apache en la VM2
+                sshagent(['55c5edfe-cded-4a87-937b-b381846887a3']) {
+                    sh 'scp index.html pablo@10.0.2.17:/var/www/html/index.html'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Despliegue completado con éxito en Apache (VM2).'
+        }
+        failure {
+            echo 'El pipeline ha fallado. Verifica los logs para más detalles.'
+        }
+    }
+}
+</code>
+
+#Genero un archivo pablo.html lo creé para sustituir el index.html, lo renombro con el nombre index.html
+
+#Subo el cambio a Git: “git add .” luego “git commit -m “nuevo Jenkinsfile y nuevo index.html” y al final el “push”
+
+#Ahora vamos a crear el pipeline en Jenkins: Iniciamos sesión en Jenkins y vamos a “Nueva Tarea” 
+
+#En la sección “Enter an item name”, le ponemos un nombre, en este caso Deploy Apache y debajo le seleccionamos que será de tipo “Pipeline”, rellenamos el formulario de la siguiente forma:
+
+#En “SCM”, ponemos el valor “Git”, en “Repository URL” la URL del Git “repojenkins”, en “Branch Specifier”, colocamos “main” y en “Script Path” configuramos el campo como “Jenkinsfile”, nombre del archivo que Jenkins buscará en el repo para ejecutar el pipeline.
+
+**Corrección de errores del pipeline anterior, solución de los mismos y resultado final del pipeline:**
+
+#Al comienzo lanzamos la ejecución y uno de los errores que tenemos es el siguiente: “Couldn't find any revision to build. Verify the repository and branch configuration for this job”, 
+
+#Investigando entiendo que Jenkins no está ejecutando correctamente la etapa de “checkout” de Git: No encuentro errores, pero lo que agrego es especificar puntualmente la rama donde está el Jenkinsfile: “git branch: 'main', url: 'https://github.com/pablonssss/repojenkins.git'” 
+
+#Este error queda corregido, ahora en la siguiente ejecución encuentro otro error: “java.lang.NoSuchMethodError: No such DSL method 'sshagent' found among steps...”
+
+#Este error se debe a que “sshagent” es un plugin que no tengo instalado en Jenkins por lo que procedo a instalarlo, en “Administrar Jenkins -> Plugins”
+
+#Luego en la siguiente ejecución y con el error del comando “sshagent” solucionado, tengo el error que está mal la clave SSH, la corrijo.
+
+#Posteriormente tengo el siguiente error: “sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper” y “sudo: a password is required”
+
+#Esto sucede porque el usuario con el que me conecto a la VM2, no tiene permisos de sudo en su equipo. Voy a la VM2 y edito el archivo /etc/sudoers, con el comando “sudo visudo” y agrego la última línea al archivo mencionado: “pablo ALL=(ALL) NOPASSWD: ALL”
+
+#Corregido esto, el error ahora, ya se presenta en la última etapa (stage “Deploy en Apache”) da un error de permisos, porque falta la palabra “sudo” cuando voy a copiar el archivo index.html al directorio /var/www/html/index.html
+
+#Corrijo este stage dejándolo de la siguiente forma:
+
+#Primero copio el archivo index.html a /home/pablo/ y luego con sudo movemos el archivo a /var/www/html/
+
+#Luego de corregir esto, la ejecución fue exitosa.
+
+**El pipeline definitivo es el siguiente:**
+
+<code>
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Clonar el repositorio desde GitHub
+                git branch: 'main', url: 'https://github.com/pablonssss/repojenkins.git'
+            }
+        }
+
+        stage('Verifico si Apache está instalado') {
+            steps {
+                // Verificar si Apache está instalado en VM2, instalar si es necesario
+                sshagent(['1092453d-8fad-4168-9714-ba0d89b5773c']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no pablo@10.0.2.17 "
+                        if ! systemctl is-active --quiet apache2; then
+                            sudo apt-get update
+                            sudo apt-get install apache2 -y
+                        fi"
+                    '''
+                }
+            }
+        }
+
+        stage('Configurar Apache') {
+            steps {
+                // Configurar y habilitar Apache en la VM2
+                sshagent(['1092453d-8fad-4168-9714-ba0d89b5773c']) {
+                    sh 'ssh pablo@10.0.2.17 "sudo systemctl is-active --quiet apache2 || sudo systemctl start apache2 && sudo systemctl enable apache2"'
+                }
+            }
+        }
+
+        stage('Deploy en Apache') {
+            steps {
+                // Primero copio el archivo a un directorio temporal y luego lo muevo con sudo
+                sshagent(['1092453d-8fad-4168-9714-ba0d89b5773c']) {
+                    sh '''scp -o StrictHostKeyChecking=no index.html pablo@10.0.2.17:/home/pablo/index.html
+                    ssh pablo@10.0.2.17 "sudo mv /home/pablo/index.html /var/www/html/index.html"         '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            // Mensaje en caso de éxito
+            echo 'Despliegue completado con éxito en Apache (VM2).'
+        }
+        failure {
+            // Mensaje en caso de fallo
+            echo 'El pipeline ha fallado. Verifica los logs para más detalles.'
+        }
+    }
+}
+</code>
